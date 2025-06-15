@@ -1,0 +1,14 @@
+# Python cache
+__pycache__/
+*.pyc
+
+# Virtual environment
+venv/
+# Dependencies
+node_modules/
+
+# Build output
+/build
+
+# Local env files
+.env
