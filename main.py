@@ -1,45 +1,32 @@
-from fastapi import FastAPI
-from pydantic import BaseModel
+from flask import Flask, request, jsonify
+from flask_cors import CORS
 import joblib
-from fastapi.middleware.cors import CORSMiddleware
-import numpy as np
 
-# Initialize FastAPI app (only once)
-app = FastAPI()
-
-# Add CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # In production, restrict this to your frontend URL
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app = Flask(__name__)
+CORS(app)  # Allow CORS for all origins
 
 # Load model and vectorizer
 model = joblib.load("sentiment_model.pkl")
 vectorizer = joblib.load("tfidf_vectorizer.pkl")
 
-# Define input format
-class Review(BaseModel):
-    text: str
+@app.route("/predict", methods=["POST"])
+def predict_sentiment():
+    data = request.get_json()
+    text = data.get("text", "")
 
-@app.post("/predict")
-async def predict_sentiment(review: Review):
-    # Vectorize the input text
-    text_vec = vectorizer.transform([review.text])
-    
-    # Predict sentiment and probability
+    if not text:
+        return jsonify({"error": "Text is required"}), 400
+
+    # Vectorize and predict
+    text_vec = vectorizer.transform([text])
     prediction = model.predict(text_vec)[0]
-    probabilities = model.predict_proba(text_vec)[0]
-    
-    # Map prediction to sentiment
+    confidence = model.predict_proba(text_vec)[0][prediction]
     sentiment = "Positive" if prediction == 1 else "Negative"
-    # Confidence is the max probability for the predicted class
-    confidence = float(probabilities[prediction])
-    
-    return {"sentiment": sentiment, "confidence": confidence}
+
+    return jsonify({
+        "sentiment": sentiment,
+        "confidence": round(float(confidence), 4)
+    })
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    app.run(host="0.0.0.0", port=8000)
